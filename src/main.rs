@@ -16,7 +16,7 @@ struct User {
 }
 
 // DATABASE_URL
-const DATABASE_URL: &str = !env::var("DATABASE_URL").expect("DATABASE URL NOT FOUND");
+const DATABASE_URL: &str =  env!("DATABASE_URL");
 // HTTP RESPONSE
 const OK_RESPONSE: &str = "HTTP/1.1 200 OK\r\n\\Content-Type: application/json\r\n\r\n";
 const NOT_FOUND: &str = "HTTP/1.1 404 NOT FOUND\r\n\\Content-Type: application/json\r\n\r\n";
@@ -49,13 +49,12 @@ fn main(){
 
 fn setup_db() -> Result<(), PostgresError> {
     let mut client = Client::connect(DATABASE_URL, NoTls)?;
-    client.execute(
+    client.batch_execute(
         "CREATE TABLE IF NOT EXISTS users (
             id SERIAL PRIMARY KEY,
             name VARCHAR NOT NULL,
             email VARCHAR NOT NULL
         )",
-        &[],
     )?;
     println!("Database set up successfully");
     Ok(())
@@ -124,6 +123,62 @@ fn get_request(request: &str) -> (String, String) {
     }
 }
 
+// ==== GET ALL ====
+fn get_all_request(_request: &str) -> (String, String) {
+    match Client::connect(DATABASE_URL, NoTls) {
+        Ok(mut client) => {
+            let mut users = Vec::new();
+
+            for row in client.query("SELECT * FROM users", &[]).unwrap() {
+                users.push(User {
+                    id: row.get(0),
+                    name: row.get(1),
+                    email: row.get(2),
+                });
+            }
+
+            (OK_RESPONSE.to_string(), serde_json::to_string(&users).unwrap())
+        }
+        _ => (INTERNAL_SERVER_ERROR.to_string(), "Error".to_string()),
+    }
+}
+
+// ==== PUT ====
+fn put_request(request: &str) -> (String, String) {
+    match
+        (
+            get_id(&request).parse::<i32>(),
+            get_user_request_body(&request),
+            Client::connect(DATABASE_URL, NoTls),
+        )
+    {
+        (Ok(id), Ok(user), Ok(mut client)) => {
+            client
+                .execute(
+                    "UPDATE users SET name = $1, email = $2 WHERE id = $3",
+                    &[&user.name, &user.email, &id]
+                )
+                .unwrap();
+
+            (OK_RESPONSE.to_string(), "User updated".to_string())
+        }
+        _ => (INTERNAL_SERVER_ERROR.to_string(), "Error".to_string()),
+    }
+}
+
+// ==== DELETE ====
+fn delete_request(request: &str) -> (String, String) {
+    match (get_id(&request).parse::<i32>(), Client::connect(DATABASE_URL, NoTls)) {
+        (Ok(id), Ok(mut client)) => {
+            let rows = client.execute("DELETE FROM users WHERE id = $1", &[&id]).unwrap();
+            if rows == 0 {
+                return (NOT_FOUND.to_string(), "User not found".to_string());
+            }
+            (OK_RESPONSE.to_string(), "User deleted".to_string())
+        }
+        _ => (INTERNAL_SERVER_ERROR.to_string(), "Error".to_string()),
+    }
+}
 
 // get_id function
 fn get_id(request: &str) -> &str {
