@@ -18,10 +18,10 @@ struct User {
 // DATABASE_URL
 const DATABASE_URL: &str = !env::var("DATABASE_URL").expect("DATABASE URL NOT FOUND");
 // HTTP RESPONSE
-const OK_RESPONSE: &str = "HTTP/1.1 200 OK\r\n\Content-Type: application/json\r\n\r\n";
-const NOT_FOUND: &str = "HTTP/1.1 404 NOT FOUND\r\n\Content-Type: application/json\r\n\r\n";
-const BAD_REQUEST: &str = "HTTP/1.1 400 BAD REQUEST\r\n\Content-Type: application/json\r\n\r\n";
-const INTERNAL_SERVER_ERROR: &str = "HTTP/1.1 500 INTERNAL SERVER ERROR\r\n\Content-Type: application/json\r\n\r\n";
+const OK_RESPONSE: &str = "HTTP/1.1 200 OK\r\n\\Content-Type: application/json\r\n\r\n";
+const NOT_FOUND: &str = "HTTP/1.1 404 NOT FOUND\r\n\\Content-Type: application/json\r\n\r\n";
+const BAD_REQUEST: &str = "HTTP/1.1 400 BAD REQUEST\r\n\\Content-Type: application/json\r\n\r\n";
+const INTERNAL_SERVER_ERROR: &str = "HTTP/1.1 500 INTERNAL SERVER ERROR\r\n\\Content-Type: application/json\r\n\r\n";
 
 // Main function
 
@@ -102,6 +102,28 @@ fn post_request(request: &str) -> (String, String) {
         _ => (INTERNAL_SERVER_ERROR.to_string(), "Error".to_string()),
     }
 }
+
+// ==== GET ====
+fn get_request(request: &str) -> (String, String) {
+    match (get_id(&request).parse::<i32>(), Client::connect(DATABASE_URL, NoTls)) {
+        (Ok(id), Ok(mut client)) =>
+            match client.query_one("SELECT * FROM users WHERE id = $1", &[&id]) {
+                Ok(row) => {
+                    let user = User {
+                        id: row.get(0),
+                        name: row.get(1),
+                        email: row.get(2),
+                    };
+
+                    (OK_RESPONSE.to_string(), serde_json::to_string(&user).unwrap())
+                }
+                _ => (NOT_FOUND.to_string(), "User not found".to_string()),
+            }
+
+        _ => (INTERNAL_SERVER_ERROR.to_string(), "Error".to_string()),
+    }
+}
+
 
 // get_id function
 fn get_id(request: &str) -> &str {
