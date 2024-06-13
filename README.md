@@ -23,7 +23,7 @@ Before running this application, ensure you have the following installed:
 
 1. Clone this repository:
  ```bash
-   git clone https://github.com/yourusername/rust-crud-rest-api.git && cd rust-crud-rest-api
+   git clone https://github.com/Kernel-rb/rust-crud-rest-api.git && cd rust-crud-rest-api
 ```
 2. Build the Docker container:
 ```bash
